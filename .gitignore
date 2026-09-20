@@ -9,6 +9,8 @@ sdkconfig.old
 sdkconfig
 dependencies.lock
 .env
+.env.local
+server-backend/main/xiaozhi-server/data/.config.yaml
 releases/
 main/assets/lang_config.h
 main/mmap_generate_emoji.h
