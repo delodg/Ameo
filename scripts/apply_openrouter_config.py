@@ -52,11 +52,20 @@ def main():
     ws_port = env.get("SERVER_WS_PORT", "8000")
     http_port = env.get("SERVER_HTTP_PORT", "8003")
     tts_voice = env.get("ASSISTANT_TTS_VOICE", "es-AR-ElenaNeural")
+    groq_api_key = env.get("GROQ_API_KEY", "")
+    groq_asr_model = env.get("GROQ_ASR_MODEL", "whisper-large-v3-turbo")
+    openrouter_asr_model = env.get("OPENROUTER_ASR_MODEL", "openai/gpt-audio-mini")
 
     if not api_key or api_key.startswith("sk-or-v1-xxxx"):
         print("ERROR: OPENROUTER_API_KEY is missing/placeholder in .env.local.")
         print("       Edit .env.local and set your real OpenRouter key, then re-run this script.")
         sys.exit(1)
+
+    use_groq_asr = bool(groq_api_key) and not groq_api_key.startswith("gsk_xxxx")
+    # Default: use OpenRouter's audio-input chat models for ASR (no separate
+    # key needed, reuses OPENROUTER_API_KEY). Set USE_GROQ_ASR=1 in .env.local
+    # to use Groq's Whisper instead.
+    use_openrouter_asr = not use_groq_asr
 
     CONFIG_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -82,6 +91,13 @@ y con buena onda, como si estuvieras hablando con un amigo de toda la vida.
   sentido español) ni de México/otros países. Rioplatense puro.
 - Si te preguntan algo técnico, respondé claro pero mantené el tono
   relajado y cercano.
+- IMPORTANTE: Respondé SIEMPRE en español rioplatense, sin importar en
+  qué idioma te hablen o en qué idioma venga el texto reconocido. Nunca
+  respondas en chino, inglés u otro idioma, aunque el texto de entrada
+  esté mal reconocido, incompleto o mezclado con otros idiomas. Si el
+  texto no tiene sentido (ruido de fondo, silencio mal interpretado),
+  respondé con buena onda en español, por ejemplo: "Che, no te escuché
+  bien, ¿podés repetir?"
 """
 
     end_prompt = """\
@@ -103,7 +119,24 @@ server:
 selected_module:
   LLM: OpenRouterLLM
   TTS: EdgeTTS
+{"  ASR: GroqASR" if use_groq_asr else "  ASR: OpenRouterASR" if use_openrouter_asr else ""}
 
+{"""ASR:
+  GroqASR:
+    type: openai
+    api_key: """ + groq_api_key + """
+    base_url: https://api.groq.com/openai/v1/audio/transcriptions
+    model_name: """ + groq_asr_model + """
+    output_dir: tmp/
+""" if use_groq_asr else """ASR:
+  OpenRouterASR:
+    type: openrouter_audio
+    api_key: """ + api_key + """
+    base_url: """ + base_url + """
+    model_name: """ + openrouter_asr_model + """
+    language: es
+    output_dir: tmp/
+""" if use_openrouter_asr else ""}
 LLM:
   OpenRouterLLM:
     type: openai
